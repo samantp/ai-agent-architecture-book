@@ -10,20 +10,47 @@
 
 Version 1 described the right topics but grounded too many claims in memory of *older versions* of these projects rather than the code actually sitting in this folder. Version 2 was re-derived from the current clones, which changed several conclusions:
 
-1. **The `open-interpreter/` folder is not the Python Open Interpreter.** It is Open Interpreter 1.0 — a Rust coding agent **forked from OpenAI's Codex CLI** (`codex-rs/*` crates). This is a gift: it means this workspace contains a production-grade Rust agent with the most sophisticated OS-level sandboxing of any project here. Chapter 6 is built on it.
+1. **The `open-interpreter/` folder is not the Python Open Interpreter.** It is Open Interpreter 1.0 — a Rust coding agent **forked from OpenAI's Codex CLI** (`open-interpreter@764a96e/codex-rs/*` crates). This is a gift: it means this workspace contains a production-grade Rust agent with the most sophisticated OS-level sandboxing of any project here. Chapter 6 is built on it.
 2. **The `OpenHands/` clone is OpenHands V1 (the app shell), not the classic agent.** The agent loop lives in external PyPI packages (`openhands-sdk`, `openhands-agent-server`, `openhands-tools` — pinned at 1.35.0 in `pyproject.toml`). What *is* in this repo — the FastAPI app server and its Docker/process/remote sandbox orchestration — turns out to be the most instructive part anyway: the agent runs *inside* the sandbox and reports back over webhooks (Chapter 6).
-3. **Cline has been re-architected** into a monorepo with a standalone agent SDK (`sdk/packages/agents`, `sdk/packages/core`). The famous `Task` class with `recursivelyMakeClineRequests` is gone; in its place is `AgentRuntime` — a clean, hook-based agent loop that is *better* teaching material (Chapter 2).
+3. **Cline has been re-architected** into a monorepo with a standalone agent SDK (`cline@6309971/sdk/packages/agents`, `cline@6309971/sdk/packages/core`). The famous `Task` class with `recursivelyMakeClineRequests` is gone; in its place is `AgentRuntime` — a clean, hook-based agent loop that is *better* teaching material (Chapter 2).
 4. Every code snippet in v2 is quoted from a file in this workspace with a `path:line` pointer, or is explicitly labeled as pseudo-code or external knowledge.
 
 ## Epistemic conventions
 
 Claims are tagged where it matters:
 
-- **[Verified]** — quoted from or directly traced through source in this workspace; a `path:line` pointer is given.
+- **[Verified]** — quoted from or directly traced through source in this workspace; a `repo@hash/path:line` pointer is given.
 - **[Inference]** — a conclusion reasoned from the code (e.g., from module structure), but not traced end-to-end.
 - **[External]** — from documentation, papers, or general knowledge; not checkable in this workspace (e.g., the OpenHands SDK internals, closed-source agents).
 
-Line numbers refer to the clones as of July 2026 and will drift as the repos move.
+### Citation convention (git-pinned)
+
+Every source reference is pinned to an exact commit and written as:
+
+```
+<repo>@<short-hash>/<path>:<line[-range]>
+e.g.  opencode@34e5809/packages/opencode/src/tool/edit.ts:682-737
+```
+
+- The short hash identifies the revision in the **pinned revisions** table below; references never resolve against a moving HEAD, so line numbers stay valid even after you `git pull` the clones (check out the pinned hash to follow one).
+- **Shorthand references** (a bare filename like `turn.rs:227`, or a partial path) inherit the repo and revision of the nearest preceding fully-qualified reference in the same passage.
+- To turn any reference into a browser permalink: `https://github.com/<upstream>/blob/<full-hash>/<path>#L<line>`.
+
+### Pinned revisions
+
+| Repo (folder) | Short | Full commit | Committed | Upstream |
+|---|---|---|---|---|
+| `cline/` | `6309971` | `63099710895e24593554b1e77ec7852f6f16c05c` | 2026-07-11 | `cline/cline` |
+| `opencode/` | `34e5809` | `34e58090595d44e3e7cc37498f16753a98627456` | 2026-07-11 | `anomalyco/opencode` |
+| `open-interpreter/` | `764a96e` | `764a96ee05853d5494d7e711eefecec57ab712ef` | 2026-07-06 | `OpenInterpreter/open-interpreter` |
+| `SWE-agent/` | `1132b3e` | `1132b3e80a45487ce8423f75d0e180874bf84caa` | 2026-07-07 | `princeton-nlp/SWE-agent` |
+| `OpenHands/` | `3949e1c` | `3949e1cc17d9443f1f4ef7d34d428baf065cd919` | 2026-07-11 | `All-Hands-AI/OpenHands` |
+| `langgraph/` | `55ec2f2` | `55ec2f21939ce7755e6398c11b541de8926245ee` | 2026-07-10 | `langchain-ai/langgraph` |
+| `autogen/` | `027ecf0` | `027ecf0a379bcc1d09956d46d12d44a3ad9cee14` | 2026-04-06 | `microsoft/autogen` |
+| `llama_index/` | `67514f6` | `67514f63410c6d4c2344e7ca14b3ea7214d0bb84` | 2026-07-08 | `run-llama/llama_index` |
+| `storm/` | `fb951af` | `fb951af7744dab086e34962e9bc6fe878e145f83` | 2025-09-30 | `stanford-oval/storm` |
+
+All nine clones were clean (no local modifications) at these revisions when the book was derived.
 
 ## The reference codebases
 

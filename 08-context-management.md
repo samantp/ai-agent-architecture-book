@@ -4,15 +4,15 @@ The context window is the agent's RAM, and it leaks: every tool result, every fi
 
 ## 8.1 Detecting pressure
 
-- **opencode** checks after every finished assistant message: `compaction.isOverflow({tokens, model})` consults the model's window, configured output reserve, and usable share (`session/overflow.ts`, called from the loop at `session/prompt.ts:1161-1168` **[Verified]**). Token counts come from the provider's own usage reports where possible; estimation falls back to `Token.estimate(JSON.stringify(modelMessages))` (`session/compaction.ts:180-186` **[Verified]**) — a chars/4-style heuristic. The lesson: **you need a cheap, always-available estimator plus provider truth when it arrives**; both will be a few percent wrong, so all thresholds must carry margin.
-- **Codex** computes a full `token_status` after *every sampling request, inside the turn*: active context tokens, an auto-compact scope limit, `tokens_until_compaction` (`session/turn.rs:306-345`, `session/context_window.rs`, `session/token_budget.rs` **[Verified]**). Crossing the limit triggers compaction **mid-turn** (`CompactionPhase::MidTurn`) — necessary because one agentic turn with dozens of tool calls can overflow a window on its own. It also *warns the model* as budget dwindles via reminder items (`session/rollout_budget.rs`, Ch. 3.5), so the model can wrap up rather than get truncated mid-thought.
-- **Cline** triggers on `reserveTokens` (headroom in absolute tokens) or `thresholdRatio` (fraction of max input), whichever is configured — `sdk/packages/core/src/extensions/context/compaction.ts:193-232` **[Verified]** — with guardrails like `MIN_CONTEXT_DERIVED_INPUT_RATIO = 0.5` (never trust a derived input limit below half the window) and a `budget-projection/` module that *projects* whether the next request will fit before sending it.
+- **opencode** checks after every finished assistant message: `compaction.isOverflow({tokens, model})` consults the model's window, configured output reserve, and usable share (`opencode@34e5809/packages/opencode/src/session/overflow.ts`, called from the loop at `opencode@34e5809/packages/opencode/src/session/prompt.ts:1161-1168` **[Verified]**). Token counts come from the provider's own usage reports where possible; estimation falls back to `Token.estimate(JSON.stringify(modelMessages))` (`opencode@34e5809/packages/opencode/src/session/compaction.ts:180-186` **[Verified]**) — a chars/4-style heuristic. The lesson: **you need a cheap, always-available estimator plus provider truth when it arrives**; both will be a few percent wrong, so all thresholds must carry margin.
+- **Codex** computes a full `token_status` after *every sampling request, inside the turn*: active context tokens, an auto-compact scope limit, `tokens_until_compaction` (`open-interpreter@764a96e/codex-rs/core/src/session/turn.rs:306-345`, `open-interpreter@764a96e/codex-rs/core/src/session/context_window.rs`, `open-interpreter@764a96e/codex-rs/core/src/session/token_budget.rs` **[Verified]**). Crossing the limit triggers compaction **mid-turn** (`CompactionPhase::MidTurn`) — necessary because one agentic turn with dozens of tool calls can overflow a window on its own. It also *warns the model* as budget dwindles via reminder items (`open-interpreter@764a96e/codex-rs/core/src/session/rollout_budget.rs`, Ch. 3.5), so the model can wrap up rather than get truncated mid-thought.
+- **Cline** triggers on `reserveTokens` (headroom in absolute tokens) or `thresholdRatio` (fraction of max input), whichever is configured — `cline@6309971/sdk/packages/core/src/extensions/context/compaction.ts:193-232` **[Verified]** — with guardrails like `MIN_CONTEXT_DERIVED_INPUT_RATIO = 0.5` (never trust a derived input limit below half the window) and a `budget-projection/` module that *projects* whether the next request will fit before sending it.
 
 ## 8.2 Tier 1 — deterministic pruning (cheap, lossy, targeted)
 
 The first response to pressure should not be an LLM call. It should be deleting things whose value has demonstrably expired — and in a coding agent, that means **old tool outputs**: the 400-line file read from 40 turns ago is almost worthless, while the assistant's *decisions* about it remain load-bearing.
 
-**opencode `prune`** — `session/compaction.ts:241-287` **[Verified]**, walking backwards through history:
+**opencode `prune`** — `opencode@34e5809/packages/opencode/src/session/compaction.ts:241-287` **[Verified]**, walking backwards through history:
 
 ```typescript
 export const PRUNE_MINIMUM = 20_000   // don't bother for < 20k tokens reclaimed
@@ -34,7 +34,7 @@ The eviction *doesn't rewrite history* — parts are flagged, and the prompt ren
 
 When pruning isn't enough, all three systems compress the *head* of the conversation into a summary and keep a verbatim *tail*. The interesting engineering is the head/tail split and the state representation.
 
-**opencode** — `session/compaction.ts` **[Verified]**:
+**opencode** — `opencode@34e5809/packages/opencode/src/session/compaction.ts` **[Verified]**:
 
 - Tail budget: `preserve_recent_tokens` config, defaulting to `clamp(25% of usable window, 2_000, 8_000)` (`preserveRecentBudget`, `:80-85`).
 - `select()` (`:188-239`) walks the last `tail_turns` (default 2) user-turns newest-first, accepting whole turns while they fit the budget; when a turn doesn't fit, `splitTurn` (`:105-128`) finds the latest *message boundary inside the turn* that fits — turns are the preferred unit, messages the fallback. Head = everything before the kept tail.
@@ -47,11 +47,11 @@ When pruning isn't enough, all three systems compress the *head* of the conversa
 
 ## 8.4 The benchmark-era alternative: observation elision
 
-SWE-agent's `LastNObservations` (`sweagent/agent/history_processors.py:85-176` **[Verified]**) predates giant windows and is still the right tool for fixed-recipe agents: keep only the last N tool *observations* verbatim, replace older ones with `"Old environment output: (57 lines omitted)"`, never elide the first observation (it's the task statement), honor per-message `keep_output`/`remove_output` tags. Thoughts and actions survive; only environment output is elided — the same "decisions outlive data" insight as §8.2, discovered in 2023.
+SWE-agent's `LastNObservations` (`SWE-agent@1132b3e/sweagent/agent/history_processors.py:85-176` **[Verified]**) predates giant windows and is still the right tool for fixed-recipe agents: keep only the last N tool *observations* verbatim, replace older ones with `"Old environment output: (57 lines omitted)"`, never elide the first observation (it's the task statement), honor per-message `keep_output`/`remove_output` tags. Thoughts and actions survive; only environment output is elided — the same "decisions outlive data" insight as §8.2, discovered in 2023.
 
 Its docstring contains the sharpest sentence in this chapter's literature **[Verified]**: *"Note that using this history processor will break prompt caching (as the history of every query will change every time)"* — mitigated by the `polling` parameter (evict every k steps, keeping between `n` and `n+polling` observations) to batch invalidations.
 
-And in miniature, STORM does the same inside a single research interview (`knowledge_storm/storm_wiki/modules/knowledge_curation.py:103-113` **[Verified]**): interview turns beyond the last 4 render as *"Expert: Omit the answer here due to space limit"* — questions kept, answers elided, 2,500-word clamp. Context management is fractal: any loop that accumulates text needs an eviction policy, even a sub-loop inside one pipeline stage.
+And in miniature, STORM does the same inside a single research interview (`storm@fb951af/knowledge_storm/storm_wiki/modules/knowledge_curation.py:103-113` **[Verified]**): interview turns beyond the last 4 render as *"Expert: Omit the answer here due to space limit"* — questions kept, answers elided, 2,500-word clamp. Context management is fractal: any loop that accumulates text needs an eviction policy, even a sub-loop inside one pipeline stage.
 
 ## 8.5 The cache constraint (the rule that shapes everything)
 
@@ -65,7 +65,7 @@ Budget rule of thumb visible in these systems: aim compaction to land you well b
 
 ## 8.6 Durable memory beyond the window
 
-Above the window sits state that must outlive it: opencode's full message log (SQLite) with flags rather than deletions; Codex's **rollout files** — append-only JSONL per session enabling exact reconstruction (`session/rollout_reconstruction.rs`, truncation handling in `thread_rollout_truncation.rs` **[Verified structure]**) plus a state DB; Cline delegating persistence to hosts; and cross-session artifacts — plan/todo files (Ch. 9), AGENTS.md-style instruction files, memory directories — which are *the agent writing to its own future context* through the filesystem. The window is a cache over durable state, not the state itself; systems that treat it that way (opencode, Codex) get resumption, audit, and multi-client for free, and their compaction becomes a *view* concern rather than a destructive operation.
+Above the window sits state that must outlive it: opencode's full message log (SQLite) with flags rather than deletions; Codex's **rollout files** — append-only JSONL per session enabling exact reconstruction (`open-interpreter@764a96e/codex-rs/core/src/session/rollout_reconstruction.rs`, truncation handling in `thread_rollout_truncation.rs` **[Verified structure]**) plus a state DB; Cline delegating persistence to hosts; and cross-session artifacts — plan/todo files (Ch. 9), AGENTS.md-style instruction files, memory directories — which are *the agent writing to its own future context* through the filesystem. The window is a cache over durable state, not the state itself; systems that treat it that way (opencode, Codex) get resumption, audit, and multi-client for free, and their compaction becomes a *view* concern rather than a destructive operation.
 
 ## 8.7 Checklist
 

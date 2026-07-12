@@ -15,7 +15,7 @@ Each stage is a swappable component with a typed interface. The architectural va
 
 ## 13.2 Chunking code with the parse tree
 
-The chunker is where retrieval quality is won or lost, and `CodeSplitter` is the reference implementation of syntax-aware chunking — `llama_index/llama-index-core/llama_index/core/node_parser/text/code.py:19` **[Verified]** (crediting SweepAI's chunking write-up in its docstring):
+The chunker is where retrieval quality is won or lost, and `CodeSplitter` is the reference implementation of syntax-aware chunking — `llama_index@67514f6/llama-index-core/llama_index/core/node_parser/text/code.py:19` **[Verified]** (crediting SweepAI's chunking write-up in its docstring):
 
 ```python
 # code.py:169 — recursive greedy packing over the tree-sitter AST
@@ -36,13 +36,13 @@ The invariant: **chunk boundaries land on AST-node boundaries** — a function i
 
 ## 13.3 Routing: retrieval strategy as an LLM decision
 
-Real corpora need multiple indexes (vector for semantics, keyword/BM25 for identifiers, summary index for "what is this repo about"). `RouterQueryEngine` — `core/query_engine/router_query_engine.py:95,160-164` **[Verified]** — makes index choice itself an LLM call: each sub-engine carries a natural-language description ("useful for finding exact class names…"), a selector prompts the model to pick one or several (`LLMSingleSelector` parses a JSON choice), and multi-selections are summarized together.
+Real corpora need multiple indexes (vector for semantics, keyword/BM25 for identifiers, summary index for "what is this repo about"). `RouterQueryEngine` — `llama_index@67514f6/llama-index-core/llama_index/core/query_engine/router_query_engine.py:95,160-164` **[Verified]** — makes index choice itself an LLM call: each sub-engine carries a natural-language description ("useful for finding exact class names…"), a selector prompts the model to pick one or several (`LLMSingleSelector` parses a JSON choice), and multi-selections are summarized together.
 
 The pattern to recognize: this is Chapter 4's tool-dispatch loop in miniature — descriptions as affordances, an LLM as the router, validation on the choice. Coding agents do the same thing with *search tools* (grep vs. glob vs. LSP vs. subagent, Ch. 7.6) — they just let the main model route instead of a dedicated selector. A dedicated router earns its extra call when the sub-engines are expensive or numerous.
 
 ## 13.4 Response synthesis: fitting N chunks through one window
 
-The `response_synthesizers/` package (**[Verified structure]**: `refine.py`, `compact_and_refine.py`, `tree_summarize.py`, `accumulate.py`, `simple_summarize.py`) is a catalog of algorithms for the terminal problem — retrieved content exceeds the window:
+The `llama_index@67514f6/llama-index-core/llama_index/core/response_synthesizers/` package (**[Verified structure]**: `refine.py`, `compact_and_refine.py`, `tree_summarize.py`, `accumulate.py`, `simple_summarize.py`) is a catalog of algorithms for the terminal problem — retrieved content exceeds the window:
 
 - **refine** — sequential fold: answer from chunk 1, then "given this answer and chunk 2, refine it," … Order-sensitive, never overflows, N calls.
 - **compact** (+refine) — pack as many chunks per call as fit, then refine across packed batches: same guarantees, ~N/k calls. The default for good reason.
@@ -62,4 +62,4 @@ A decision rule consistent with everything in this workspace:
 | Large + static + semantic (docs, wikis, papers, tickets) | **this chapter** — embed once, retrieve forever |
 | Cross-session agent memory | hybrid: files-as-memory first; vector index when it outgrows grep |
 
-And the integration pattern that preserves agency: expose retrieval to the agent **as a tool** (`query_docs(question) → synthesized answer + citations`) rather than stuffing top-k chunks into the prompt pre-emptively. Pre-emptive RAG spends window on guesses; tool-shaped RAG lets the model decide when external knowledge is needed — the same escalation discipline as Chapter 7's cognition ladder. LlamaIndex's own agent layer (`core/agent/` — ReAct and function-calling workflow agents **[Verified structure]**) closes the loop by wrapping any query engine as exactly such a tool.
+And the integration pattern that preserves agency: expose retrieval to the agent **as a tool** (`query_docs(question) → synthesized answer + citations`) rather than stuffing top-k chunks into the prompt pre-emptively. Pre-emptive RAG spends window on guesses; tool-shaped RAG lets the model decide when external knowledge is needed — the same escalation discipline as Chapter 7's cognition ladder. LlamaIndex's own agent layer (`llama_index@67514f6/llama-index-core/llama_index/core/agent/` — ReAct and function-calling workflow agents **[Verified structure]**) closes the loop by wrapping any query engine as exactly such a tool.

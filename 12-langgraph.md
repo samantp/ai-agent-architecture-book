@@ -6,7 +6,7 @@ The coding agents of Part I hand control flow to the model and engineer guardrai
 
 A compiled graph runs as repeated **supersteps**. Each superstep: determine which nodes were triggered by the last step's channel updates; run them *in parallel* against a **snapshot** of state; collect their writes; apply all writes **atomically**; checkpoint. Nodes never see each other's mid-step writes — reads come from the previous superstep's world, exactly like Pregel vertices.
 
-The engine loop is `PregelLoop.tick()` / `after_tick()` — `langgraph/libs/langgraph/langgraph/pregel/_loop.py:599-718` **[Verified]**, abridged:
+The engine loop is `PregelLoop.tick()` / `after_tick()` — `langgraph@55ec2f2/libs/langgraph/langgraph/pregel/_loop.py:599-718` **[Verified]**, abridged:
 
 ```python
 def tick(self) -> bool:
@@ -36,7 +36,7 @@ State is not one dict but a set of **channels**, each with an update discipline 
 
 ## 12.2 Checkpointers: the persistence interface
 
-Durability is one small interface — `libs/checkpoint/langgraph/checkpoint/base/__init__.py:176-300` **[Verified]**: `BaseCheckpointSaver.get_tuple(config)`, `.put(config, checkpoint, metadata, new_versions)`, `.put_writes(config, writes, task_id)`, `.list(...)` — keyed by `thread_id` (a conversation/execution identity) and `checkpoint_id` (a specific superstep). Implementations: in-memory, SQLite, Postgres (`libs/checkpoint-*`).
+Durability is one small interface — `langgraph@55ec2f2/libs/checkpoint/langgraph/checkpoint/base/__init__.py:176-300` **[Verified]**: `BaseCheckpointSaver.get_tuple(config)`, `.put(config, checkpoint, metadata, new_versions)`, `.put_writes(config, writes, task_id)`, `.list(...)` — keyed by `thread_id` (a conversation/execution identity) and `checkpoint_id` (a specific superstep). Implementations: in-memory, SQLite, Postgres (`langgraph@55ec2f2/libs/checkpoint-*`).
 
 Because a checkpoint lands after *every* superstep, the thread's history is a **persistent chain of full states**, which yields, uniformly:
 
@@ -50,7 +50,7 @@ The subtle mechanism worth knowing: `put_writes` persists *individual task resul
 
 ## 12.4 Interrupts: human-in-the-loop as an exception you resume
 
-LangGraph's approval mechanism is dynamic interruption from *inside* a node — `libs/langgraph/langgraph/types.py:811` **[Verified]**:
+LangGraph's approval mechanism is dynamic interruption from *inside* a node — `langgraph@55ec2f2/libs/langgraph/langgraph/types.py:811` **[Verified]**:
 
 ```python
 def node(state):
@@ -67,7 +67,7 @@ The documented semantics carry two sharp edges (docstring, `types.py:824-831` **
 
 ## 12.5 Where this fits against Part I
 
-The prebuilt `create_react_agent` (`libs/prebuilt` **[Verified structure]**) is exactly Chapter 2's loop — model node ⇄ tool node with a conditional edge — re-expressed as a two-node graph, which makes the comparison precise:
+The prebuilt `create_react_agent` (`langgraph@55ec2f2/libs/prebuilt` **[Verified structure]**) is exactly Chapter 2's loop — model node ⇄ tool node with a conditional edge — re-expressed as a two-node graph, which makes the comparison precise:
 
 - What LangGraph *adds*: free durability/time-travel per step, enforced workflow structure, safe parallel branches, park-and-resume approvals.
 - What it *doesn't solve*: everything inside the model node — prompt assembly, context management, edit-tool robustness, permissions — i.e., all of Chapters 3–10. A LangGraph coding agent still needs that entire stack; the graph replaces only the `while` loop and the persistence layer.

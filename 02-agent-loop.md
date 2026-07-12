@@ -4,7 +4,7 @@ Four production loops, four different answers to the same three questions: *wher
 
 ## 2.1 Cline: the distilled in-memory loop
 
-Cline's SDK contains the cleanest statement of the canonical loop. `AgentRuntime.execute()` — `cline/sdk/packages/agents/src/agent-runtime.ts:570` **[Verified]**, abridged to its skeleton:
+Cline's SDK contains the cleanest statement of the canonical loop. `AgentRuntime.execute()` — `cline@6309971/sdk/packages/agents/src/agent-runtime.ts:570` **[Verified]**, abridged to its skeleton:
 
 ```typescript
 // agent-runtime.ts:604 (abridged; error/event plumbing elided)
@@ -49,7 +49,7 @@ State lives in `this.state.messages` — a mutable array. Persistence, resumptio
 
 ## 2.2 SWE-agent: the requery loop and an error taxonomy
 
-SWE-agent's loop (Python, synchronous) is `step()` around `forward_with_handling()` — `SWE-agent/sweagent/agent/agents.py:1006-1170` **[Verified]**. Its contribution is not the loop shape but the most explicit **error taxonomy** in this workspace. `forward()` raises; each exception class gets a distinct policy:
+SWE-agent's loop (Python, synchronous) is `step()` around `forward_with_handling()` — `SWE-agent@1132b3e/sweagent/agent/agents.py:1006-1170` **[Verified]**. Its contribution is not the loop shape but the most explicit **error taxonomy** in this workspace. `forward()` raises; each exception class gets a distinct policy:
 
 ```python
 # agents.py:1106 (abridged)
@@ -84,7 +84,7 @@ Note also `forward()` attaches the partially-built step to the exception (`e.ste
 
 ## 2.3 opencode: the loop as a state reconciler
 
-opencode inverts the Cline design. The loop holds **no in-memory conversation state at all**. Each iteration re-reads the persisted message log and decides what the session needs next — `opencode/packages/opencode/src/session/prompt.ts:1081` **[Verified]**, abridged:
+opencode inverts the Cline design. The loop holds **no in-memory conversation state at all**. Each iteration re-reads the persisted message log and decides what the session needs next — `opencode@34e5809/packages/opencode/src/session/prompt.ts:1081` **[Verified]**, abridged:
 
 ```typescript
 // prompt.ts:1088 (abridged)
@@ -126,7 +126,7 @@ Cline persists *after* state changes; opencode persists *as* the state change. I
 
 ## 2.4 Codex: turns, tasks, and mid-turn steering
 
-Codex (the `open-interpreter/codex-rs` clone) splits the loop into two levels. A **task** loops over **turns**; a turn loops over **sampling requests**. `core/src/tasks/regular.rs:73` **[Verified]**:
+Codex (the `open-interpreter@764a96e/codex-rs` clone) splits the loop into two levels. A **task** loops over **turns**; a turn loops over **sampling requests**. `open-interpreter@764a96e/codex-rs/core/src/tasks/regular.rs:73` **[Verified]**:
 
 ```rust
 loop {
@@ -138,7 +138,7 @@ loop {
 }
 ```
 
-And inside `run_turn` (`core/src/session/turn.rs:227` **[Verified]**, heavily abridged):
+And inside `run_turn` (`open-interpreter@764a96e/codex-rs/core/src/session/turn.rs:227` **[Verified]**, heavily abridged):
 
 ```rust
 loop {

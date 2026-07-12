@@ -38,11 +38,11 @@ A useful mental model for the whole book: **the LLM is a stateless function**. E
 
 Across all five coding agents (Cline, opencode, Codex/Open Interpreter, SWE-agent, OpenHands) the same five subsystems appear, whatever the folder names:
 
-1. **Session/state store** — the message history and its persistence. In-memory arrays (Cline's SDK), an event-sourced message log in SQLite (opencode), JSONL "rollout" files plus a state DB (Codex `codex-rs/core/src/state/`, `session/rollout_reconstruction.rs`), trajectory JSON on disk (SWE-agent), a server-side event store (OpenHands `openhands/app_server/event/`).
+1. **Session/state store** — the message history and its persistence. In-memory arrays (Cline's SDK), an event-sourced message log in SQLite (opencode), JSONL "rollout" files plus a state DB (Codex `open-interpreter@764a96e/codex-rs/core/src/state/`, `open-interpreter@764a96e/codex-rs/core/src/session/rollout_reconstruction.rs`), trajectory JSON on disk (SWE-agent), a server-side event store (OpenHands `OpenHands@3949e1c/openhands/app_server/event/`).
 2. **The loop / turn engine** — Chapter 2.
 3. **The tool runtime** — registry, schema, dispatch, result shaping. Chapter 4–5.
 4. **The execution environment** — where side effects happen: host process, PTY, container, or OS sandbox. Chapter 6.
-5. **The client(s)** — TUI, IDE extension, web UI — connected to the above by a protocol: gRPC in Cline (`apps/vscode/src/core/controller/grpc-handler.ts`), an HTTP/event server in opencode (`packages/opencode/src/server/`), a JSON app-server protocol in Codex (`codex-rs/app-server-protocol/`), REST + webhooks in OpenHands (`openhands/app_server/`).
+5. **The client(s)** — TUI, IDE extension, web UI — connected to the above by a protocol: gRPC in Cline (`cline@6309971/apps/vscode/src/core/controller/grpc-handler.ts`), an HTTP/event server in opencode (`packages/opencode/src/server/`), a JSON app-server protocol in Codex (`open-interpreter@764a96e/codex-rs/app-server-protocol/`), REST + webhooks in OpenHands (`OpenHands@3949e1c/openhands/app_server/`).
 
 The subsystem list is unremarkable. The architecture is in the *cuts* — which of these run in the same process, and what crosses the boundary between them.
 
@@ -50,7 +50,7 @@ The subsystem list is unremarkable. The architecture is in the *cuts* — which 
 
 ### Topology A — Embedded library (Cline SDK)
 
-Cline's re-architecture (this clone; the pre-2025 extension was a monolith) extracts the agent into an embeddable SDK: `sdk/packages/agents/src/agent-runtime.ts` exposes `AgentRuntime`, a class you construct with a model provider, tools, and hooks, and call `run()` on. The VS Code extension, the CLI (`apps/cli`), and a hub/daemon (`sdk/packages/core/src/hub/`) are all *hosts* of the same runtime. **[Verified]**
+Cline's re-architecture (this clone; the pre-2025 extension was a monolith) extracts the agent into an embeddable SDK: `cline@6309971/sdk/packages/agents/src/agent-runtime.ts` exposes `AgentRuntime`, a class you construct with a model provider, tools, and hooks, and call `run()` on. The VS Code extension, the CLI (`apps/cli`), and a hub/daemon (`cline@6309971/sdk/packages/core/src/hub/`) are all *hosts* of the same runtime. **[Verified]**
 
 - State: in-memory during a run; the host persists.
 - Everything in one process; the host mediates UI and approvals via hook callbacks (`hooks.beforeTool`, `requestToolApproval` — `agent-runtime.ts:1216,1269`).
@@ -58,13 +58,13 @@ Cline's re-architecture (this clone; the pre-2025 extension was a monolith) extr
 
 ### Topology B — Local client/server with an event-sourced core (opencode)
 
-opencode runs a server (`packages/opencode/src/server/`) owning sessions, tools, permissions, and an LSP client pool; the TUI (`packages/tui`, Go), desktop, and web clients speak to it over HTTP + an event bus (`src/bus/`). The defining decision: **the session loop re-derives its state from the persisted message log on every iteration** (Chapter 2.3), making the server restartable and the UI a pure subscriber. **[Verified]**
+opencode runs a server (`packages/opencode/src/server/`) owning sessions, tools, permissions, and an LSP client pool; the TUI (`opencode@34e5809/packages/tui`, Go), desktop, and web clients speak to it over HTTP + an event bus (`opencode@34e5809/packages/opencode/src/bus/`). The defining decision: **the session loop re-derives its state from the persisted message log on every iteration** (Chapter 2.3), making the server restartable and the UI a pure subscriber. **[Verified]**
 
 - Tradeoff: excellent crash recovery and multi-client support; every loop iteration pays a read-and-reconstruct cost; all execution is still on the user's machine.
 
 ### Topology C — Turn/task state machine over a submission queue (Codex / Open Interpreter 1.0)
 
-`codex-rs/core` structures the agent as **tasks** processed against a **session**: a `RegularTask` (`core/src/tasks/regular.rs`) runs `run_turn` repeatedly; user input arriving mid-turn lands in an `input_queue` and is drained at the top of the next loop iteration (`core/src/session/turn.rs:227-235`) rather than interrupting the process. Clients (CLI/TUI, IDE plugins, the app server) communicate through a protocol crate. Execution is on-host but wrapped in OS sandboxes (Chapter 6). **[Verified]**
+`open-interpreter@764a96e/codex-rs/core` structures the agent as **tasks** processed against a **session**: a `RegularTask` (`open-interpreter@764a96e/codex-rs/core/src/tasks/regular.rs`) runs `run_turn` repeatedly; user input arriving mid-turn lands in an `input_queue` and is drained at the top of the next loop iteration (`open-interpreter@764a96e/codex-rs/core/src/session/turn.rs:227-235`) rather than interrupting the process. Clients (CLI/TUI, IDE plugins, the app server) communicate through a protocol crate. Execution is on-host but wrapped in OS sandboxes (Chapter 6). **[Verified]**
 
 - Tradeoff: precise turn semantics (pending input, per-turn diffs via `turn_diff_tracker.rs`, per-turn token accounting) at the cost of the most intricate state machine in this workspace.
 
@@ -72,13 +72,13 @@ opencode runs a server (`packages/opencode/src/server/`) owning sessions, tools,
 
 The strongest isolation stance here, and a reversal of the classic design. The classic (v1-book-era) OpenHands ran the agent on the server and shipped individual *actions* into a runtime container. In this clone, the **whole agent server runs inside the sandbox container**, and the app server is just an orchestrator:
 
-- `openhands/app_server/sandbox/docker_sandbox_service.py:385-513` starts a container from an *agent-server image*, injects a per-sandbox `SESSION_API_KEY`, and sets a webhook callback URL (`http://host.docker.internal:<port>/api/v1/webhooks`) through which the agent posts events back. **[Verified]**
-- Conversations are proxied to the sandboxed agent server; events are stored and re-streamed to the browser by the app server (`app_server/event/`, `event_callback/`). **[Verified]**
+- `OpenHands@3949e1c/openhands/app_server/sandbox/docker_sandbox_service.py:385-513` starts a container from an *agent-server image*, injects a per-sandbox `SESSION_API_KEY`, and sets a webhook callback URL (`http://host.docker.internal:<port>/api/v1/webhooks`) through which the agent posts events back. **[Verified]**
+- Conversations are proxied to the sandboxed agent server; events are stored and re-streamed to the browser by the app server (`OpenHands@3949e1c/openhands/app_server/event/`, `event_callback/`). **[Verified]**
 - The agent loop itself is in the external `openhands-sdk` package — not in this repo. **[Verified boundary; SDK internals External]**
 
 - Tradeoff: a compromised or misbehaving agent is contained (it holds only its own session key, inside a container); but every user-visible byte crosses two hops, and local-filesystem workflows require mounts.
 
-SWE-agent is a fifth data point but not a fifth topology: a batch CLI where the loop runs locally and *all* side effects go to a remote/containerized shell session through the SWE-ReX deployment abstraction (`sweagent/environment/swe_env.py:8-17`) — architecturally a degenerate case of D (execution remote, agent local) optimized for thousands of parallel benchmark runs. **[Verified]**
+SWE-agent is a fifth data point but not a fifth topology: a batch CLI where the loop runs locally and *all* side effects go to a remote/containerized shell session through the SWE-ReX deployment abstraction (`SWE-agent@1132b3e/sweagent/environment/swe_env.py:8-17`) — architecturally a degenerate case of D (execution remote, agent local) optimized for thousands of parallel benchmark runs. **[Verified]**
 
 ## 1.4 Choosing a topology
 

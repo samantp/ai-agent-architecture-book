@@ -6,7 +6,7 @@ Bash is the agent's most powerful tool and its entire attack surface. The engine
 
 A fresh shell per command breaks `cd`, exports, activated virtualenvs, and background servers — and models *assume* shell state persists, because humans' shells do. Every mature runtime therefore maintains long-lived sessions:
 
-- **SWE-agent** routes every command into a persistent session on a remote "deployment" through the SWE-ReX abstraction — `sweagent/environment/swe_env.py:197` **[Verified]**:
+- **SWE-agent** routes every command into a persistent session on a remote "deployment" through the SWE-ReX abstraction — `SWE-agent@1132b3e/sweagent/environment/swe_env.py:197` **[Verified]**:
 
 ```python
 def communicate(self, input: str, timeout=25, *, check="ignore", ...) -> str:
@@ -16,16 +16,16 @@ def communicate(self, input: str, timeout=25, *, check="ignore", ...) -> str:
 ```
 
   `AbstractDeployment` (imported at `swe_env.py:8-17`) has Docker/local/remote implementations — the agent code is identical whether the shell lives in a container on the laptop or a fleet in the cloud (how SWE-bench runs thousands of parallel instances). `read_file`/`write_file` are separate RPCs on the same runtime rather than `cat`-over-shell — structured operations avoid quoting/encoding hazards.
-- **Codex** has a dedicated `unified_exec` subsystem (`codex-rs/core/src/unified_exec/`) for persistent interactive sessions, plus `shell_snapshot.rs` — capturing the user's shell environment (PATH, aliases-adjacent config) so agent commands see the same world the user's terminal does **[Verified structure]**.
-- **opencode** ships its shell tool with a persistent PTY layer (`src/tool/shell/`, `shell.ts`) and the server owns the processes, so TUI restarts don't kill running builds **[Verified structure]**.
+- **Codex** has a dedicated `unified_exec` subsystem (`open-interpreter@764a96e/codex-rs/core/src/unified_exec/`) for persistent interactive sessions, plus `shell_snapshot.rs` — capturing the user's shell environment (PATH, aliases-adjacent config) so agent commands see the same world the user's terminal does **[Verified structure]**.
+- **opencode** ships its shell tool with a persistent PTY layer (`opencode@34e5809/packages/opencode/src/tool/shell/`, `shell.ts`) and the server owns the processes, so TUI restarts don't kill running builds **[Verified structure]**.
 
 Universal complications, solved in all three: *output framing* (knowing when a command finished — sentinel markers/exit-code capture inside the session), *timeouts as first-class results* (a timeout is an observation for the model, not an exception), and *ANSI stripping* before results enter context.
 
 ## 6.2 OS-level sandboxing: the Codex depth chart
 
-The `codex-rs` tree contains the most serious open-source implementation of per-process sandboxing for agents — one backend per OS, unified behind a policy layer (`codex-rs/sandboxing/` crate, adapted into the core at `core/src/sandboxing/mod.rs`) **[Verified]**.
+The `codex-rs` tree contains the most serious open-source implementation of per-process sandboxing for agents — one backend per OS, unified behind a policy layer (`open-interpreter@764a96e/codex-rs/sandboxing/` crate, adapted into the core at `open-interpreter@764a96e/codex-rs/core/src/sandboxing/mod.rs`) **[Verified]**.
 
-**macOS — Seatbelt.** Commands run under `sandbox-exec` with a generated profile. The checked-in base policy (`sandboxing/src/seatbelt_base_policy.sbpl` **[Verified]**) opens with the two lines that matter:
+**macOS — Seatbelt.** Commands run under `sandbox-exec` with a generated profile. The checked-in base policy (`open-interpreter@764a96e/codex-rs/sandboxing/src/seatbelt_base_policy.sbpl` **[Verified]**) opens with the two lines that matter:
 
 ```scheme
 ; inspired by Chrome's sandbox policy
@@ -39,20 +39,20 @@ The `codex-rs` tree contains the most serious open-source implementation of per-
 
 Deny-default with enumerated allowances (down to individual sysctls), writable roots parameterized per invocation (the workspace directory), and a separate network policy file (`seatbelt_network_policy.sbpl`). The Chrome-sandbox citation is the tell: this is browser-grade sandboxing technique applied to agent tool calls.
 
-**Linux — Landlock + seccomp via re-exec.** `sandboxing/src/landlock.rs` builds *command-line arguments for a helper binary* (`create_linux_sandbox_command_args`, `:23-65` **[Verified]**) — the agent re-executes itself (`codex-linux-sandbox`, the `linux-sandbox/` crate) which installs Landlock filesystem rules + seccomp filters and then `exec`s the target. Sandboxing-by-wrapper keeps the policy out-of-process and composable. **Fallback tiers**: `bwrap.rs` (bubblewrap) and `windows-sandbox-rs` cover other environments; `SandboxType` selects per platform.
+**Linux — Landlock + seccomp via re-exec.** `open-interpreter@764a96e/codex-rs/sandboxing/src/landlock.rs` builds *command-line arguments for a helper binary* (`create_linux_sandbox_command_args`, `:23-65` **[Verified]**) — the agent re-executes itself (`codex-linux-sandbox`, the `open-interpreter@764a96e/codex-rs/linux-sandbox/` crate) which installs Landlock filesystem rules + seccomp filters and then `exec`s the target. Sandboxing-by-wrapper keeps the policy out-of-process and composable. **Fallback tiers**: `bwrap.rs` (bubblewrap) and `windows-sandbox-rs` cover other environments; `SandboxType` selects per platform.
 
 **Beyond syscalls — policy on commands and network:**
 
-- The `execpolicy/` crate defines which *commands* are safe, in **Starlark** policy files **[Verified structure]** — a programmable allow/deny/match layer (`exec_policy.rs`, with `command_canonicalization.rs` normalizing invocations so `python3 -c ...` can't smuggle past a `python` rule) that runs before any OS sandbox is even consulted.
-- Network egress is its own subsystem: a managed proxy (`codex_network_proxy`, wired through `ExecRequest.network` — `core/src/sandboxing/mod.rs:46-68` **[Verified]**), per-request network approvals (`core/src/tools/network_approval.rs`), and honest environment markers so tooling inside the sandbox can adapt: `CODEX_SANDBOX_NETWORK_DISABLED=1`, `CODEX_SANDBOX=seatbelt` (`mod.rs:140-149` **[Verified]**).
+- The `open-interpreter@764a96e/codex-rs/execpolicy/` crate defines which *commands* are safe, in **Starlark** policy files **[Verified structure]** — a programmable allow/deny/match layer (`exec_policy.rs`, with `command_canonicalization.rs` normalizing invocations so `python3 -c ...` can't smuggle past a `python` rule) that runs before any OS sandbox is even consulted.
+- Network egress is its own subsystem: a managed proxy (`codex_network_proxy`, wired through `ExecRequest.network` — `open-interpreter@764a96e/codex-rs/core/src/sandboxing/mod.rs:46-68` **[Verified]**), per-request network approvals (`open-interpreter@764a96e/codex-rs/core/src/tools/network_approval.rs`), and honest environment markers so tooling inside the sandbox can adapt: `CODEX_SANDBOX_NETWORK_DISABLED=1`, `CODEX_SANDBOX=seatbelt` (`mod.rs:140-149` **[Verified]**).
 
-The composite is a **defense-in-depth stack**: command policy (Starlark) → OS mechanism (seatbelt/Landlock/bwrap) → network proxy → and above all of it, the approval loop: run sandboxed by default; on a sandbox denial, surface an approval request to run outside it **[Inference from `tools/sandboxing.rs` + approval templates; the escalation flow is Codex's documented behavior]**.
+The composite is a **defense-in-depth stack**: command policy (Starlark) → OS mechanism (seatbelt/Landlock/bwrap) → network proxy → and above all of it, the approval loop: run sandboxed by default; on a sandbox denial, surface an approval request to run outside it **[Inference from `open-interpreter@764a96e/codex-rs/core/src/tools/sandboxing.rs` + approval templates; the escalation flow is Codex's documented behavior]**.
 
-Cline's SDK, notably, is growing the same organ: `sdk/packages/core/src/runtime/tools/subprocess-sandbox.ts` **[Verified structure]** — evidence that per-process sandboxing is becoming table stakes even for IDE-resident agents.
+Cline's SDK, notably, is growing the same organ: `cline@6309971/sdk/packages/core/src/runtime/tools/subprocess-sandbox.ts` **[Verified structure]** — evidence that per-process sandboxing is becoming table stakes even for IDE-resident agents.
 
 ## 6.3 Container isolation: OpenHands puts the agent in the box
 
-OpenHands V1 inverts the classic layout (Ch. 1.3D): instead of sandboxing *commands*, it sandboxes **the whole agent**. The app server's Docker sandbox service — `openhands/app_server/sandbox/docker_sandbox_service.py:385-513` **[Verified]**:
+OpenHands V1 inverts the classic layout (Ch. 1.3D): instead of sandboxing *commands*, it sandboxes **the whole agent**. The app server's Docker sandbox service — `OpenHands@3949e1c/openhands/app_server/sandbox/docker_sandbox_service.py:385-513` **[Verified]**:
 
 ```python
 async def start_sandbox(self, sandbox_spec_id=None, sandbox_id=None) -> SandboxInfo:
@@ -75,7 +75,7 @@ async def start_sandbox(self, sandbox_spec_id=None, sandbox_id=None) -> SandboxI
 The architecture that falls out:
 
 - The container runs the **agent server** (loop + tools + LLM access, from the external `openhands-agent-server` package). The app server *orchestrates*: starts/pauses sandboxes, proxies the UI, stores events.
-- **Events flow back over webhooks** — the sandboxed agent POSTs to `host.docker.internal:<port>/api/v1/webhooks`; the app server persists and re-streams to browsers (`app_server/event/`, `event_callback/`). Contrast with opencode (shared DB) and Cline (in-process events): once the agent is network-isolated from its UI, your event bus becomes HTTP.
+- **Events flow back over webhooks** — the sandboxed agent POSTs to `host.docker.internal:<port>/api/v1/webhooks`; the app server persists and re-streams to browsers (`OpenHands@3949e1c/openhands/app_server/event/`, `event_callback/`). Contrast with opencode (shared DB) and Cline (in-process events): once the agent is network-isolated from its UI, your event bus becomes HTTP.
 - **Credential scoping**: each sandbox gets a random session API key; a compromised sandbox can spoof only itself.
 - The unglamorous details are the production story: LRU pausing to cap concurrent sandboxes, `init=True` for zombie reaping, random host ports with env-var advertisement, CORS origins injected for remote browser access (`:427-437`), optional host networking and KVM passthrough (`:470-481`).
 - The same `SandboxService` interface has **process** (local subprocess — dev mode) and **remote** (delegated to a fleet API) implementations (`process_sandbox_service.py`, `remote_sandbox_service.py` **[Verified structure]**) — isolation level is a deployment decision, not an architecture change.

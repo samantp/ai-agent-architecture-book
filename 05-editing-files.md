@@ -15,7 +15,7 @@ Line-number formats died because agents edit iteratively and every edit invalida
 
 ## 5.2 opencode: the replacer chain
 
-`opencode/packages/opencode/src/tool/edit.ts` **[Verified]**. A `Replacer` is a generator producing *candidate strings* that might correspond to the model's `oldString` in the actual file:
+`opencode@34e5809/packages/opencode/src/tool/edit.ts` **[Verified]**. A `Replacer` is a generator producing *candidate strings* that might correspond to the model's `oldString` in the actual file:
 
 ```typescript
 // edit.ts:217
@@ -72,7 +72,7 @@ Four load-bearing properties:
 
 ## 5.3 Codex: a patch DSL with the same matcher inside
 
-Codex rejects search/replace in favor of a multi-file patch envelope — taught to the model as a grammar in the system prompt (`codex-rs/core/prompt_with_apply_patch_instructions.md:279+` **[Verified]**):
+Codex rejects search/replace in favor of a multi-file patch envelope — taught to the model as a grammar in the system prompt (`open-interpreter@764a96e/codex-rs/core/prompt_with_apply_patch_instructions.md:279+` **[Verified]**):
 
 ```
 Patch      := "*** Begin Patch" NL { FileOp } "*** End Patch" NL
@@ -85,7 +85,7 @@ Hunk       := "@@" [ header ] NL { (" "|"-"|"+") text NL }
 
 Context is 3 lines before/after each change; when 3 lines can't uniquely locate a hunk, the model escalates to `@@ class BaseClass` / stacked `@@` headers — **scope-qualified addressing instead of more context lines**. Compared to search/replace: one call edits many files atomically, renames are first-class, and add/delete are explicit ops rather than degenerate replacements.
 
-But when a hunk's context must be located in the file, the problem is identical to opencode's — and so is the solution. `codex-rs/apply-patch/src/seek_sequence.rs` **[Verified]**:
+But when a hunk's context must be located in the file, the problem is identical to opencode's — and so is the solution. `open-interpreter@764a96e/codex-rs/apply-patch/src/seek_sequence.rs` **[Verified]**:
 
 ```rust
 /// Matches are attempted with decreasing strictness: exact match, then
@@ -102,11 +102,11 @@ pub(crate) fn seek_sequence(lines: &[String], pattern: &[String], start: usize, 
 
 Same ordered-leniency idea, in Rust, written independently. Additional details that reward study: the `eof` flag anchors end-of-file hunks by trying `lines.len() - pattern.len()` *first* (patterns meant for the file's end should bind there, not at an earlier coincidental match); the guard for `pattern.len() > lines.len()` carries a comment dating the panic it fixed — patch appliers accumulate scar tissue.
 
-The tool contract is fail-closed and *verified*: `ApplyPatchAction`/`AppliedPatchDelta` track applied changes and whether the application `is_exact()` (`apply-patch/src/lib.rs:184-211` **[Verified]**), and the system prompt then leans on the contract — *"Do not waste tokens by re-reading files after `apply_patch`. The tool call will fail if it didn't work."* The prompt promise and the runtime guarantee are one design.
+The tool contract is fail-closed and *verified*: `ApplyPatchAction`/`AppliedPatchDelta` track applied changes and whether the application `is_exact()` (`open-interpreter@764a96e/codex-rs/apply-patch/src/lib.rs:184-211` **[Verified]**), and the system prompt then leans on the contract — *"Do not waste tokens by re-reading files after `apply_patch`. The tool call will fail if it didn't work."* The prompt promise and the runtime guarantee are one design.
 
 ## 5.4 SWE-agent: the ACI argument, and linting-gated edits
 
-SWE-agent's `str_replace_editor` (`tools/edit_anthropic/bin/str_replace_editor`, a Python program installed *into the sandbox* — the ACI/"Agent-Computer Interface" thesis: don't give the model human tools, design tools for models) enforces the same rules at its stricter extreme — no fuzzy fallbacks at all **[Verified]**:
+SWE-agent's `str_replace_editor` (`SWE-agent@1132b3e/tools/edit_anthropic/bin/str_replace_editor`, a Python program installed *into the sandbox* — the ACI/"Agent-Computer Interface" thesis: don't give the model human tools, design tools for models) enforces the same rules at its stricter extreme — no fuzzy fallbacks at all **[Verified]**:
 
 ```
 # :523-537 (paraphrased from source)
@@ -117,7 +117,7 @@ occurrences = content.count(old_str)
 old == new → "No replacement was performed, old_str is the same as new_str."
 ```
 
-For a benchmark agent, determinism beats forgiveness: a fuzzy match that guesses wrong poisons the trajectory, while a hard failure just costs one requery. The repo also preserves the evolutionary record — `tools/windowed_edit_replace`, `windowed_edit_linting`, `windowed_edit_rewrite` **[Verified structure]**: the earlier "windowed" file interface (view N lines, edit within the window) with a variant that ran a **linter as an edit gate**, rejecting edits that introduce syntax errors — verification pulled forward into the mutation itself, the same move as shellcheck-before-execution (Ch. 2.2).
+For a benchmark agent, determinism beats forgiveness: a fuzzy match that guesses wrong poisons the trajectory, while a hard failure just costs one requery. The repo also preserves the evolutionary record — `SWE-agent@1132b3e/tools/windowed_edit_replace`, `windowed_edit_linting`, `windowed_edit_rewrite` **[Verified structure]**: the earlier "windowed" file interface (view N lines, edit within the window) with a variant that ran a **linter as an edit gate**, rejecting edits that introduce syntax errors — verification pulled forward into the mutation itself, the same move as shellcheck-before-execution (Ch. 2.2).
 
 ## 5.5 Convergent design rules
 

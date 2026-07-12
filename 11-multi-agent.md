@@ -4,7 +4,7 @@ Two philosophies of multi-agent coexist in this workspace. The coding agents use
 
 ## 11.1 The substrate: an actor runtime, not a chat loop
 
-AutoGen's core has no conversations in it at all. `autogen-core` is a message runtime: `SingleThreadedAgentRuntime` (`python/packages/autogen-core/src/autogen_core/_single_threaded_agent_runtime.py:149` **[Verified]**) processes an asyncio queue of typed envelopes:
+AutoGen's core has no conversations in it at all. `autogen-core` is a message runtime: `SingleThreadedAgentRuntime` (`autogen@027ecf0/python/packages/autogen-core/src/autogen_core/_single_threaded_agent_runtime.py:149` **[Verified]**) processes an asyncio queue of typed envelopes:
 
 ```python
 self._message_queue: Queue[PublishMessageEnvelope | SendMessageEnvelope
@@ -13,7 +13,7 @@ async def send_message(self, message, recipient, ...) -> Any:        # :332  RPC
 async def publish_message(self, message, topic_id, ...) -> None:     # :387  pub/sub fan-out
 ```
 
-Agents are addressed by `(type, key)` and **instantiated lazily** when a message first arrives; subscriptions map topic types to agent types. The same programming model scales out — `protos/agent_worker.proto` and `cloudevent.proto` **[Verified]** define a gRPC worker protocol with CloudEvents envelopes, so a "team" can span processes and languages (the `dotnet/` tree implements the same runtime for .NET). The layering claim: *conversations are a library feature* (`autogen-agentchat`) *built on a distributed-actor substrate* — which is why AutoGen teams can be paused, distributed, and observed like any message-driven system.
+Agents are addressed by `(type, key)` and **instantiated lazily** when a message first arrives; subscriptions map topic types to agent types. The same programming model scales out — `autogen@027ecf0/protos/agent_worker.proto` and `cloudevent.proto` **[Verified]** define a gRPC worker protocol with CloudEvents envelopes, so a "team" can span processes and languages (the `dotnet/` tree implements the same runtime for .NET). The layering claim: *conversations are a library feature* (`autogen-agentchat`) *built on a distributed-actor substrate* — which is why AutoGen teams can be paused, distributed, and observed like any message-driven system.
 
 ## 11.2 Coordination by LLM: the selector loop
 
@@ -46,11 +46,11 @@ Two cheaper siblings share the manager interface: `RoundRobinGroupChat` (fixed r
 
 ## 11.3 Termination as a first-class, composable object
 
-Group chats do not decide when to stop; **conditions** do — `autogen_agentchat/conditions/_terminations.py` **[Verified]** ships `StopMessageTermination`, `MaxMessageTermination`, `TextMentionTermination`, `TokenUsageTermination`, `TimeoutTermination`, `HandoffTermination`, `ExternalTermination`, `FunctionalTermination` — combinable with `|` and `&`. Externalizing the stop rule from agent logic is the design to copy: coding agents hard-code their stop conditions in the loop (Ch. 2); a multi-agent system cannot, because no single agent sees the whole picture — so it must be policy *over the event stream*.
+Group chats do not decide when to stop; **conditions** do — `autogen@027ecf0/python/packages/autogen-agentchat/src/autogen_agentchat/conditions/_terminations.py` **[Verified]** ships `StopMessageTermination`, `MaxMessageTermination`, `TextMentionTermination`, `TokenUsageTermination`, `TimeoutTermination`, `HandoffTermination`, `ExternalTermination`, `FunctionalTermination` — combinable with `|` and `&`. Externalizing the stop rule from agent logic is the design to copy: coding agents hard-code their stop conditions in the loop (Ch. 2); a multi-agent system cannot, because no single agent sees the whole picture — so it must be policy *over the event stream*.
 
 ## 11.4 The orchestrator pattern: Magentic-One's two ledgers
 
-`MagenticOneGroupChat` is AutoGen's answer to open-ended tasks, and its orchestrator prompts encode the most explicit anti-stall machinery in this workspace (`teams/_group_chat/_magentic_one/` **[Verified]**):
+`MagenticOneGroupChat` is AutoGen's answer to open-ended tasks, and its orchestrator prompts encode the most explicit anti-stall machinery in this workspace (`autogen@027ecf0/python/packages/autogen-agentchat/src/autogen_agentchat/teams/_group_chat/_magentic_one/` **[Verified]**):
 
 - A **task ledger** — facts gathered, plan, team roster — maintained by dedicated prompts (`_get_task_ledger_facts_prompt`, `_plan_prompt`, with *update* variants for re-planning — `_magentic_one_orchestrator.py:107-119`).
 - A **progress ledger** evaluated every round as structured JSON (`_prompts.py:114-118` **[Verified]**):

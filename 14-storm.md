@@ -4,7 +4,7 @@ STORM (Stanford) writes Wikipedia-grade articles from nothing but a topic. It ea
 
 ## 14.1 The pipeline
 
-`knowledge_storm/storm_wiki/engine.py` **[Verified structure]** wires four stages, each an isolated module with typed inputs/outputs:
+`storm@fb951af/knowledge_storm/storm_wiki/engine.py` **[Verified structure]** wires four stages, each an isolated module with typed inputs/outputs:
 
 ```
 topic → KnowledgeCuration (research) → InformationTable
@@ -21,7 +21,7 @@ STORM's research quality comes from asking *different questions*, not more quest
 
 ## 14.3 The simulated interview
 
-The core loop — two LLMs interviewing each other — `storm_wiki/modules/knowledge_curation.py:25-81` **[Verified]**:
+The core loop — two LLMs interviewing each other — `storm@fb951af/knowledge_storm/storm_wiki/modules/knowledge_curation.py:25-81` **[Verified]**:
 
 ```python
 # ConvSimulator.forward (abridged)
@@ -43,7 +43,7 @@ Two production details inside this loop, both context management in miniature (c
 
 ## 14.4 Grounded synthesis
 
-Downstream stages maintain the citation chain: curation yields an `InformationTable` (turns + sources); outline generation drafts from the model's prior, then *refines against the interviews* (structure informed by what research actually found); article generation writes **section by section**, each section retrieving its own support from the table (per-section embedding search) so no single call needs the full corpus — `tree_summarize`/`compact` shapes again (Ch. 13.4); polish adds the lead and dedupes. Every claim in the output traces to a retrieved source; the pipeline's *shape* enforces what a "cite your sources" instruction merely requests. (`collaborative_storm/` extends this to a human-in-the-roundtable variant — **[Verified structure]**.)
+Downstream stages maintain the citation chain: curation yields an `InformationTable` (turns + sources); outline generation drafts from the model's prior, then *refines against the interviews* (structure informed by what research actually found); article generation writes **section by section**, each section retrieving its own support from the table (per-section embedding search) so no single call needs the full corpus — `tree_summarize`/`compact` shapes again (Ch. 13.4); polish adds the lead and dedupes. Every claim in the output traces to a retrieved source; the pipeline's *shape* enforces what a "cite your sources" instruction merely requests. (`storm@fb951af/knowledge_storm/collaborative_storm/` extends this to a human-in-the-roundtable variant — **[Verified structure]**.)
 
 ## 14.5 What transfers to coding agents
 
