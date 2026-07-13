@@ -6,7 +6,23 @@
 
 ---
 
+## What this is
+
+Tools like Cursor, Claude Code, Cline, and OpenHands look, from the outside, like a chat window bolted onto an LLM. What actually makes them work — turning a fallible text-completion model into something that can read a million-line codebase, edit files without corrupting them, run a shell safely, and recover when it gets confused — is a substantial pile of ordinary software engineering: event logs, state machines, permission systems, approximate string matching, OS sandboxing. That engineering is almost never written down. It lives scattered across the source of a dozen open-source projects, each of which reinvented large parts of it independently.
+
+This booklet is an attempt to write it down once, in one place, grounded in real code rather than in blog-post generalities.
+
+**The method:** nine open-source agent projects are cloned into sibling folders in this workspace (see the table below). Each chapter picks a concern — the agent loop, editing files, sandboxing, context management, multi-agent coordination — and works through how multiple independent implementations solved it, quoting actual source with file-and-line citations. Where the implementations agree, that convergence is treated as evidence of a real, load-bearing pattern. Where they disagree, the trade-off is made explicit rather than papered over.
+
+**The intended reader** is someone who already knows how to build software — a principal engineer, architect, or technical lead — and wants to understand agent internals at the same depth they'd want for, say, a database engine or a compiler: the actual algorithms and data structures, not a product pitch. It deliberately stays out of the underlying LLM/RL theory; the assumption is that "the model" is a capable-but-unreliable black box, and the interesting engineering is everything built *around* it.
+
+**How to use it:** start with the [table of contents](#table-of-contents) below and either read start to end (Parts I–IV build on each other) or jump straight to whatever concern you're currently facing (e.g. "how do agents edit files without corrupting them" → Chapter 5). Chapter 15 is a standalone build guide if you're implementing an agent yourself. Every non-trivial claim carries a `repo@hash/path:line` citation you can open directly — see [Citation convention](#citation-convention-git-pinned) below for how to resolve one.
+
+---
+
 ## What changed from v1
+
+*(This section is a changelog against an earlier draft of this booklet and is only relevant if you read that draft. First-time readers can skip to [The reference codebases](#the-reference-codebases).)*
 
 Version 1 described the right topics but grounded too many claims in memory of *older versions* of these projects rather than the code actually sitting in this folder. Version 2 was re-derived from the current clones, which changed several conclusions:
 
